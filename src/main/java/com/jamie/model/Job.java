@@ -21,22 +21,6 @@ public class Job implements Serializable {
     //任务主题
     private JobTopic jobTopic;
 
-
-    public enum JobStatus {
-        //可执行状态，等待消费
-        ready,
-        //不可执行状态，等待时钟周期。
-        delay,
-        //已被消费者读取，但还未得到消费者的响应（delete、finish）
-        reserved,
-        //已被消费完成
-        finish,
-        //已被删除
-        deleted
-    }
-
-    //任务状态
-    private JobStatus jobStatus;
     //任务延迟多少时间执行
     private Integer delay;
     //任务执行超时时间
@@ -60,13 +44,6 @@ public class Job implements Serializable {
         this.jobTopic = jobTopic;
     }
 
-    public JobStatus getJobStatus() {
-        return jobStatus;
-    }
-
-    public void setJobStatus(JobStatus jobStatus) {
-        this.jobStatus = jobStatus;
-    }
 
     public Integer getDelay() {
         return delay;
@@ -90,5 +67,16 @@ public class Job implements Serializable {
 
     public void setBody(String body) {
         this.body = body;
+    }
+
+    @Override
+    public String toString() {
+        return "Job{" +
+                "id='" + id + '\'' +
+                ", jobTopic=" + jobTopic +
+                ", delay=" + delay +
+                ", timeout=" + timeout +
+                ", body='" + body + '\'' +
+                '}';
     }
 }

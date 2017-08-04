@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
+import java.util.List;
+import java.util.Set;
 
 public class RedisUtil {
     private static final Logger logger = LoggerFactory.getLogger(RedisUtil.class);
@@ -12,7 +14,9 @@ public class RedisUtil {
     private static final Integer REDIS_PORT = 6379;
     private static final String REDIS_PREIFX = "Delay_Queue_";
     public static final String REDIS_JOB_POOL = "Job_Pool";
-    public static final String REDIS_JOB_READY = "Ready_Queue";
+    public static final String REDIS_JOB_READY = "Ready_Queue_";
+    public static final String REDIS_JOB_BUCKET = "Bucket_Queue_";
+    public static final String REDIS_JOB_BUCKET_LOCK = "Bucket_Lock_";
     static JedisPool pool = null;
 
     static {
@@ -37,7 +41,20 @@ public class RedisUtil {
         try {
             jedis.del((REDIS_PREIFX + key).getBytes());
         } catch (Exception e) {
-            logger.info("设置属性异常");
+            logger.info("delObject 删除 key 异常");
+        } finally {
+            if (jedis != null) {
+                jedis.close();
+            }
+        }
+    }
+
+    public static void del(String key) {
+        Jedis jedis = RedisUtil.getJedis();
+        try {
+            jedis.del(REDIS_PREIFX + key);
+        } catch (Exception e) {
+            logger.info("del 删除key异常");
         } finally {
             if (jedis != null) {
                 jedis.close();
@@ -78,7 +95,9 @@ public class RedisUtil {
         Object o = null;
         try {
             byte[] byteVal = jedis.get((REDIS_PREIFX + key).getBytes());
-            o = KryoUtil.deserialize(byteVal);
+            if (byteVal != null) {
+                o = KryoUtil.deserialize(byteVal);
+            }
         } catch (Exception e) {
             logger.info("设置属性异常");
         } finally {
@@ -116,23 +135,22 @@ public class RedisUtil {
      * @param key
      * @return
      */
-    public static Object rpop(String key) {
+    public static String brpop(String key, int timeout) {
         Jedis jedis = RedisUtil.getJedis();
-        Object o = null;
         try {
-            //取出列表的最后一个元素，先进先出
-            byte[] byteVal = jedis.rpop((REDIS_PREIFX + key).getBytes());
-            if (byteVal != null) {
-                o = KryoUtil.deserialize(byteVal);
+            //取出列表的最后一个元素，先进先出,阻塞
+            List<String> list = jedis.brpop(timeout, REDIS_PREIFX + key);
+            if (list != null && list.size() > 0) {
+                return list.get(1);
             }
         } catch (Exception e) {
-            logger.info("redis 取出 list 异常");
+            logger.info("redis rpop 取出 list 异常");
         } finally {
             if (jedis != null) {
                 jedis.close();
             }
         }
-        return o;
+        return null;
     }
 
     /**
@@ -143,7 +161,7 @@ public class RedisUtil {
      * @param score
      * @return
      */
-    public static Boolean zadd(String key, String value, Long score) {
+    public static Boolean ZAdd(String key, String value, Long score) {
         Jedis jedis = RedisUtil.getJedis();
         try {
             jedis.zadd(REDIS_PREIFX + key, score, value);
@@ -154,6 +172,78 @@ public class RedisUtil {
             if (jedis != null) {
                 jedis.close();
             }
+        }
+        return false;
+    }
+
+
+    /**
+     * 取出sort set中指定区间score的值
+     *
+     * @param key
+     * @param min
+     * @param max
+     * @return
+     */
+    public static Set<String> ZRangeByScore(String key, String min, String max) {
+        Jedis jedis = RedisUtil.getJedis();
+        Set<String> result = null;
+        try {
+            result = jedis.zrangeByScore(REDIS_PREIFX + key, min, max);
+        } catch (Exception e) {
+            logger.info("sort set ZRangeByScore 异常");
+        } finally {
+            if (jedis != null) {
+                jedis.close();
+            }
+        }
+        return result;
+    }
+
+    /**
+     * sort set 移除元素
+     *
+     * @param key
+     * @param member
+     * @return
+     */
+    public static Boolean ZRem(String key, String member) {
+        Jedis jedis = RedisUtil.getJedis();
+        try {
+            jedis.zrem(REDIS_PREIFX + key, member);
+            return true;
+        } catch (Exception e) {
+            logger.info("sort set Zrem 异常");
+        } finally {
+            if (jedis != null) {
+                jedis.close();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * setnx锁操作
+     *
+     * @param key
+     * @param value
+     * @param expire
+     * @return
+     */
+    public static Boolean setnx(String key, String value, int expire) {
+        Jedis jedis = getJedis();
+        try {
+            Long result = jedis.setnx(REDIS_PREIFX + key, value);
+            if (result == 1) {
+                //设置成功，加过期时间
+                jedis.expire(REDIS_PREIFX + key, expire);
+                return true;
+            }
+        } catch (Exception e) {
+            logger.error("setnx锁操作!", e);
+        } finally {
+            if (null != jedis)
+                jedis.close();
         }
         return false;
     }

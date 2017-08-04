@@ -22,7 +22,7 @@ public class Job implements Serializable {
     private JobTopic jobTopic;
 
     //任务延迟多少时间执行
-    private Integer delay;
+    private Long delay;
     //任务执行超时时间
     private Integer timeout;
     //Job的内容，供消费者做具体的业务处理，以json格式存储
@@ -45,11 +45,11 @@ public class Job implements Serializable {
     }
 
 
-    public Integer getDelay() {
+    public Long getDelay() {
         return delay;
     }
 
-    public void setDelay(Integer delay) {
+    public void setDelay(Long delay) {
         this.delay = delay;
     }
 

@@ -38,7 +38,12 @@ public class RedisQueueConsumerServiceImpl implements RedisQueueConsumerService 
             String jobId = iterator.next();
             logger.info("Bucket Queue找到topic为：{} 的 JobId:{}", topic.name(), jobId);
             Job job = (Job) RedisUtil.getObject(jobId);
-            if (job != null && now >= job.getDelay()) {
+            if (job == null) {
+                //pool中取不到元数据的在Bucket中将其删除
+                RedisUtil.ZRem(RedisUtil.REDIS_JOB_BUCKET + topic.name(), jobId);
+                continue;
+            }
+            if (now >= job.getDelay()) {
                 logger.info("Bucket Queue处理topic为：{} 的 Job:{}", topic.name(), job.toString());
                 //放入ready queue
                 Boolean push = RedisUtil.lpush(RedisUtil.REDIS_JOB_READY + topic.name(), jobId);
@@ -68,7 +73,7 @@ public class RedisQueueConsumerServiceImpl implements RedisQueueConsumerService 
         Long currentTime = System.currentTimeMillis() / 1000;
         logger.info("Ready Queue开始处理Topic为{}的Job，内容为{}的业务逻辑，延迟2s", topic.name(), job.toString());
         Thread.sleep(2000);
-        logger.info("Ready Queue处理完任务 {} 的时间: {},相差:{} 秒",job.getId(), currentTime, (currentTime - job.getDelay()));
+        logger.info("Ready Queue处理完任务 {} 的时间: {},相差:{} 秒", job.getId(), currentTime, (currentTime - job.getDelay()));
         //从pool中删除资源
         RedisUtil.delObject(jobId);
         return true;
